@@ -1,7 +1,6 @@
-# Debian (glibc) base so native modules build cleanly
 FROM node:22-bookworm-slim
 
-# Build deps for node-gyp + kerberos + X11 (native-keymap) + pkg-config
+# Native build deps (node-gyp, kerberos, native-keymap)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 build-essential pkg-config git openssh-client ca-certificates \
     libkrb5-dev \
@@ -10,21 +9,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Install deps first (cache-friendly)
-COPY package*.json ./
-
-# Make npm/node-gyp happy
-ENV npm_config_python=/usr/bin/python3
-ENV NPM_CONFIG_LEGACY_PEER_DEPS=true
-
-# Prefer lockfile; fall back to install
-RUN npm ci || npm install
-
-# Bring in the rest
+# ⬇️ Important: copy the whole repo before install so preinstall.js exists
 COPY . .
 
-# Build if present; otherwise no-op
-RUN npm run build || echo "No build step"
+# Helpful env for node-gyp and flaky peer/optional deps
+ENV npm_config_python=/usr/bin/python3
+ENV NPM_CONFIG_LEGACY_PEER_DEPS=true
+# (optional) if optional native deps keep failing, uncomment:
+# ENV NPM_CONFIG_OPTIONAL=false
+
+# Install deps (prefer lockfile if present)
+RUN npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+# If you disabled optional deps above, mirror it:
+# RUN npm ci --omit=optional --no-audit --no-fund || npm install --omit=optional --no-audit --no-fund
+
+# Build if defined
+RUN npm run build || echo "no build script"
 
 EXPOSE 3000
 CMD ["npm", "start"]
