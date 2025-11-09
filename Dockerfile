@@ -1,27 +1,29 @@
-# Use Debian (glibc) so native prebuilds work and we can install krb5 headers
+# Debian (glibc) base so native modules build cleanly
 FROM node:22-bookworm-slim
 
-# Build dependencies for node-gyp + kerberos (GSSAPI)
+# Build deps for node-gyp + kerberos + X11 (native-keymap) + pkg-config
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 build-essential pkg-config libkrb5-dev git openssh-client ca-certificates \
+    python3 build-essential pkg-config git openssh-client ca-certificates \
+    libkrb5-dev \
+    libx11-dev libxkbfile-dev \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install deps first for better caching
+# Install deps first (cache-friendly)
 COPY package*.json ./
 
 # Make npm/node-gyp happy
 ENV npm_config_python=/usr/bin/python3
 ENV NPM_CONFIG_LEGACY_PEER_DEPS=true
 
-# Prefer lockfile when present, fall back to install
+# Prefer lockfile; fall back to install
 RUN npm ci || npm install
 
-# Bring in the rest of the source
+# Bring in the rest
 COPY . .
 
-# Build if you have a build script; otherwise no-op
+# Build if present; otherwise no-op
 RUN npm run build || echo "No build step"
 
 EXPOSE 3000
