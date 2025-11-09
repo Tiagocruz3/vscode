@@ -1,24 +1,27 @@
-# Use Node 22 to satisfy engine requirements
-FROM node:22-alpine
+# Use Debian (glibc) so native prebuilds work and we can install krb5 headers
+FROM node:22-bookworm-slim
 
-# node-gyp build deps
-RUN apk add --no-cache python3 make g++ pkgconfig libc6-compat
+# Build dependencies for node-gyp + kerberos (GSSAPI)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 build-essential pkg-config libkrb5-dev git openssh-client ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install deps first (better caching)
+# Install deps first for better caching
 COPY package*.json ./
-# Use python3 for node-gyp and make peer-deps lenient
+
+# Make npm/node-gyp happy
 ENV npm_config_python=/usr/bin/python3
 ENV NPM_CONFIG_LEGACY_PEER_DEPS=true
 
-# If you need devDeps to build, keep this as plain install:
+# Prefer lockfile when present, fall back to install
 RUN npm ci || npm install
 
-# Copy the rest
+# Bring in the rest of the source
 COPY . .
 
-# Try to build if your project has a build script; otherwise no-op
+# Build if you have a build script; otherwise no-op
 RUN npm run build || echo "No build step"
 
 EXPOSE 3000
