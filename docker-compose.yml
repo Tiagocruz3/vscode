@@ -1,10 +1,20 @@
 services:
   app:
+    container_name: brainstorm-ai-aicodeasist
     build:
       context: .
       dockerfile: Dockerfile
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
+      - npm_config_python=/usr/bin/python3
+      - NPM_CONFIG_LEGACY_PEER_DEPS=true
     ports:
       - "3000:3000"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', r => process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
