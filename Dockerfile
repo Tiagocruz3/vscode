@@ -1,18 +1,24 @@
-FROM node:20-alpine
+# Use Node 22 to satisfy engine requirements
+FROM node:22-alpine
+
+# node-gyp build deps
+RUN apk add --no-cache python3 make g++ pkgconfig libc6-compat
 
 WORKDIR /app
 
-# Copy manifests first for better layer caching
+# Install deps first (better caching)
 COPY package*.json ./
-
-# ✅ Avoid peer-dep conflicts during install
+# Use python3 for node-gyp and make peer-deps lenient
+ENV npm_config_python=/usr/bin/python3
 ENV NPM_CONFIG_LEGACY_PEER_DEPS=true
-RUN npm install
+
+# If you need devDeps to build, keep this as plain install:
+RUN npm ci || npm install
 
 # Copy the rest
 COPY . .
 
-# Build if your project has a build step (safe no-op otherwise)
+# Try to build if your project has a build script; otherwise no-op
 RUN npm run build || echo "No build step"
 
 EXPOSE 3000
